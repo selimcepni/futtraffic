@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Saha • Maç stüdyosu</title><link rel="stylesheet" href="studio.css">
+<header><strong>SAHA <span>/ Maç stüdyosu</span></strong><a href="#rapor">Oyuncu raporları</a></header>
+<main><h1>Maç inceleme</h1><div class="grid" id="cameras"></div>
+<section class="bar"><button id="anchor">Bu iki anı eşleştir</button><button id="play">Birlikte oynat</button><button id="pause">Duraklat</button><output id="offset"></output></section>
+<p id="message" role="status"></p>
+<h2>Oyuncu atama</h2><section class="bar"><form id="add"><input id="name" placeholder="Futbolcu adı" aria-label="Futbolcu adı" maxlength="60" required><button>Kadroya ekle</button></form><select id="person" aria-label="Futbolcu seç"></select><button id="assign">Seçili takipleri ata</button><button id="unassign">Atamayı kaldır</button></section>
+<div class="bar"><label>Kamera <select id="filter"><option value="">Tümü</option><option>A</option><option>B</option></select></label><label><input type="checkbox" id="free"> Yalnız atanmayanlar</label><output id="count"></output></div>
+<div id="cards" class="cards"></div><button id="more" hidden>Daha fazla takip</button>
+<h2 id="rapor">Futbolcu kartları</h2><div id="stats" class="cards"></div></main>
+<dialog id="cal"><form method="dialog"><button>Kapat</button></form><h2>Saha kalibrasyonu</h2><p>Sahanın gerçek ölçülerini gir. Görüntüde konumunu bildiğin, sahaya yayılmış en az dört zemin noktasına tıkla. Her noktanın aynı saha köşesine göre metre koordinatını gir.</p>
+<label>Uzunluk (m) <input id="length" type="number" min="1"></label> <label>Genişlik (m) <input id="width" type="number" min="1"></label><img id="frame" alt="Kalibrasyon için saha görüntüsü"><div id="points"></div><button id="undo">Son noktayı sil</button> <button id="solve">Kalibrasyonu kaydet</button><output id="calmsg"></output></dialog>
+<script type="module" src="studio.js"></script></html>
