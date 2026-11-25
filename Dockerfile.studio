@@ -1,0 +1,9 @@
+FROM python:3.12-slim-bookworm
+WORKDIR /opt/futtraffic
+ENV PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libgomp1 libgl1 && rm -rf /var/lib/apt/lists/*
+COPY app/server/requirements.txt /tmp/studio-requirements.txt
+RUN python -m pip install --no-cache-dir torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu126
+RUN printf 'torch==2.8.0\ntorchvision==0.23.0\n' >/tmp/torch-constraints.txt && python -m pip install --no-cache-dir -c /tmp/torch-constraints.txt -r /tmp/studio-requirements.txt rfdetr
+COPY . .
+CMD ["python", "app/server/docker_studio.py"]
