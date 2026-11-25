@@ -43,6 +43,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
+from starlette.staticfiles import StaticFiles
 
 import agent
 import chats
@@ -130,6 +131,44 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="fut traffic", lifespan=lifespan)
+studio_dir = Path(__file__).parent / "studio"
+if studio_dir.is_dir():
+    app.mount("/studyo", StaticFiles(directory=studio_dir, html=True), name="studio")
+
+
+@app.post("/api/studio/calibration")
+async def studio_calibration(request: Request):
+    """Fit a perspective map from measured ground points on a small pitch."""
+    import cv2
+    import numpy as np
+
+    data = await _json(request)
+    try:
+        length, width = float(data["length"]), float(data["width"])
+        pairs = np.asarray(data["points"], dtype=float)
+    except (KeyError, ValueError, TypeError):
+        raise HTTPException(400, "Saha ölçülerini ve nokta koordinatlarını doldur.")
+    if not (0 < length <= 200 and 0 < width <= 200):
+        raise HTTPException(400, "Saha ölçüleri metre cinsinden 0 ile 200 arasında olmalı.")
+    if pairs.ndim != 2 or pairs.shape[1] != 4 or not 4 <= len(pairs) <= 100 or not np.isfinite(pairs).all():
+        raise HTTPException(400, "4 ile 100 arasında geçerli nokta seç.")
+    pixels, metres = pairs[:, :2], pairs[:, 2:]
+    if (pixels < 0).any() or (metres < 0).any() or (metres > [length, width]).any():
+        raise HTTPException(400, "Noktalar görüntü ve saha sınırları içinde olmalı.")
+    for coords in (pixels, metres):
+        singular = np.linalg.svd(coords - coords.mean(axis=0), compute_uv=False)
+        if len(np.unique(coords, axis=0)) != len(coords) or singular[1] <= .02 * singular[0]:
+            raise HTTPException(400, "Farklı ve sahaya yayılmış noktalar seç.")
+    matrix, _ = cv2.findHomography(pixels, metres, method=0)
+    if matrix is None or not np.isfinite(matrix).all() or np.linalg.matrix_rank(matrix) < 3:
+        raise HTTPException(400, "Kalibrasyon çözülemedi.")
+    projected = cv2.perspectiveTransform(pixels.reshape(-1, 1, 2), matrix).reshape(-1, 2)
+    rms = float(np.sqrt(np.mean(np.sum((projected - metres) ** 2, axis=1))))
+    if not np.isfinite(rms) or rms > 2:
+        raise HTTPException(400, "Noktalar uyuşmuyor. Metre koordinatlarını kontrol et.")
+    return {"projection_type": "perspective", "pitch": {"length": length, "width": width},
+            "H": matrix.tolist(), "rms_error_m": rms, "studio_ground_points": pairs.tolist()}
+
 
 
 # ------------------------------------------------------------------ origin
