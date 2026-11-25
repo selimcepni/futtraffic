@@ -1,0 +1,32 @@
+name: futtraffic-studio
+services:
+  studio:
+    build:
+      context: .
+      dockerfile: Dockerfile.studio
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      FUTTRAFFIC_DATA: /var/lib/futtraffic
+    volumes:
+      - matches:/var/lib/futtraffic
+      - models:/root/.cache
+    shm_size: "2gb"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; assert urllib.request.urlopen('http://127.0.0.1:8000/studyo/', timeout=4).status == 200"]
+      interval: 5s
+      timeout: 6s
+      retries: 24
+      start_period: 20s
+volumes:
+  matches:
+  models:

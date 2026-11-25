@@ -1,0 +1,9 @@
+.git
+.venv
+**/node_modules
+**/__pycache__
+**/.next
+.env
+**/.env
+*.mp4
+**/*.mp4
