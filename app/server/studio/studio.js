@@ -12,14 +12,15 @@ async function api(url,opts){const res=await fetch(url,opts);if(!res.ok)throw Er
 const base = a=>'/api/matches/'+encodeURIComponent(db.jobs[a]);
 const time = t=>Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0');
 function stop(){linked=false;angles.forEach(a=>feeds[a].v.pause())}
+function selectedAngles(){return angles.filter(a => Boolean(db.jobs[a]))}
 function ready(){if(!angles.every(a=>db.jobs[a]&&feeds[a].v.readyState>=1))throw Error('Önce iki videoyu seçip yüklenmelerini bekle.')}
 function change(a,id){
- stop();db.jobs[a]=id;save();selected.clear();const f=feeds[a];f.tracks=[];f.report={};f.digest=false;f.stats=false;f.busy=false;f.rev++;f.sel.value=id;
+ stop();note('');db.jobs[a]=id;save();selected.clear();const f=feeds[a];f.tracks=[];f.report={};f.digest=false;f.stats=false;f.busy=false;f.rev++;f.sel.value=id;
  if(id)f.v.src=base(a)+'/video';else f.v.removeAttribute('src');f.v.load();f.state.textContent='';render();if(id)refresh(a);
 }
 async function refresh(a){
  const id=db.jobs[a], f=feeds[a], rev=f.rev;if(!id||f.busy)return;f.busy=true;
- try{const st=await api(base(a));if(rev!==f.rev)return;f.state.textContent=st.error||({done:'Analiz tamamlandı',calibrating:'Kalibrasyon bekliyor',queued:'Sırada',tracking:'Oyuncular izleniyor',failed:'İşlem başarısız'}[st.status]||st.status);
+ try{const st=await api(base(a));if(rev!==f.rev)return;f.state.textContent=st.error||({done:'Analiz tamamlandı',calibrating:'Analizi başlatmak için bu kameranın sahasını kalibre et.',queued:'Sırada',tracking:'Oyuncular izleniyor',failed:'İşlem başarısız'}[st.status]||st.status);
  if(st.status==='done'&&!f.stats){const [digest,report]=await Promise.all([api(base(a)+'/tracks'),api(base(a)+'/match.json')]);if(rev!==f.rev)return;f.tracks=digest.tracks;f.fps=digest.fps;f.report=report;f.stats=true;render()}
  }catch(e){if(rev===f.rev)f.state.textContent=e.message}finally{if(rev===f.rev)f.busy=false}
 }
@@ -43,13 +44,26 @@ $('solve').onclick=async()=>{const a=calAngle;$('solve').disabled=true;try{
  await api(base(a)+'/calibration',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});feeds[a].stats=false;feeds[a].report={};render();$('cal').close();await refresh(a);note('Kalibrasyon kaydedildi.');
  }catch(e){$('calmsg').textContent=e.message}finally{$('solve').disabled=false}};
 $('anchor').onclick=()=>{try{ready();stop();pair().offset=feeds.B.v.currentTime-feeds.A.v.currentTime;save();render()}catch(e){note(e.message)}};
-$('play').onclick=async()=>{try{ready();const off=pair().offset;if(off===null)throw Error('Her iki videoyu aynı pozisyonda durdurup bu iki anı eşleştir.');const lo=Math.max(0,-off),hi=Math.min(feeds.A.v.duration,feeds.B.v.duration-off);if(hi<=lo)throw Error('Ortak zaman aralığı bulunamadı.');let t=feeds.A.v.currentTime;if(t<lo||t>=hi)t=lo;feeds.A.v.currentTime=t;feeds.B.v.currentTime=t+off;await Promise.all(angles.map(a=>feeds[a].v.play()));linked=true}catch(e){stop();note(e.message)}};
+$('play').onclick=async()=>{try{
+ const active=selectedAngles();
+ if(active.length===1){
+   note('');
+   await feeds[active[0]].v.play();
+   return;
+ }
+ ready();const off=pair().offset;if(off===null)throw Error('Her iki videoyu aynı pozisyonda durdurup bu iki anı eşleştir.');const lo=Math.max(0,-off),hi=Math.min(feeds.A.v.duration,feeds.B.v.duration-off);if(hi<=lo)throw Error('Ortak zaman aralığı bulunamadı.');let t=feeds.A.v.currentTime;if(t<lo||t>=hi)t=lo;feeds.A.v.currentTime=t;feeds.B.v.currentTime=t+off;await Promise.all(angles.map(a=>feeds[a].v.play()));linked=true}catch(e){stop();note(e.message)}};
 $('pause').onclick=stop;
 setInterval(()=>{if(!linked)return;const b=feeds.B.v,t=feeds.A.v.currentTime+pair().offset;if(t<0||t>=b.duration)return stop();if(Math.abs(b.currentTime-t)>.35)b.currentTime=t},450);
 function rows(){return angles.flatMap(a=>feeds[a].tracks.map(t=>({a,t,key:a+'/'+t.id})))}
 function seek(a,t){stop();feeds[a].v.currentTime=(t.f??t.first_f)/feeds[a].fps}
 function render(){
- const p=pair(),all=rows();$('offset').textContent=p.offset===null?'Açılar henüz eşleşmedi':'B − A: '+p.offset.toFixed(2)+' sn';
+ const p=pair(),all=rows(),active=selectedAngles();
+ $('anchor').hidden=active.length!==2;
+ $('offset').hidden=active.length!==2;
+ $('play').disabled=active.length===0;
+ $('pause').disabled=active.length===0;
+ $('play').textContent=active.length===2?'Birlikte oynat':'Videoyu oynat';
+ $('offset').textContent=p.offset===null?'Açılar henüz eşleşmedi':'B − A: '+p.offset.toFixed(2)+' sn';
  const names=Object.entries(db.people),person=$('person'),old=person.value;person.replaceChildren(option('Futbolcu seç',''));for(const [id,n] of names)person.add(option(n,id));person.value=old;
  const visible=all.filter(r=>(!$('filter').value||$('filter').value===r.a)&&(!$('free').checked||!p.map[r.key]));
  $('count').textContent=visible.length+' takip · '+selected.size+' seçili';$('cards').replaceChildren();$('more').hidden=visible.length<=limit;
